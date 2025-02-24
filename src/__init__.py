@@ -1,3 +1,1 @@
-"""
-Quant Base main package.
-"""
+"""Quant Base package."""

@@ -88,7 +88,7 @@ Quant Base 是一个量化交易基础框架，提供股票数据获取、处理
 ### 安装方法
 1. 克隆代码仓库：
 ```bash
-git clone https://github.com/yourusername/quant_base.git
+git clone https://github.com/Bigmartin121/quant_base.git
 cd quant_base
 ```
 

@@ -5,53 +5,59 @@
 工具函数的单元测试
 """
 
-import unittest
-import json
 import os
+import unittest
 import tempfile
-from src.utils.helpers import load_json, save_json, format_stock_code
+import json
+from src.utils.helpers import save_to_json, load_from_json, ensure_directory
 
-class TestHelpers(unittest.TestCase):
-    """测试工具函数类"""
+class TestUtils(unittest.TestCase):
+    """测试工具函数"""
     
     def setUp(self):
         """测试前的准备工作"""
-        # 创建临时目录用于测试文件操作
-        self.test_dir = tempfile.mkdtemp()
-        self.test_file = os.path.join(self.test_dir, 'test.json')
-        self.test_data = {'test': 'data', 'number': 123}
+        self.temp_dir = tempfile.mkdtemp()
     
     def tearDown(self):
         """测试后的清理工作"""
-        # 删除测试过程中创建的文件
-        if os.path.exists(self.test_file):
-            os.remove(self.test_file)
-        os.rmdir(self.test_dir)
+        for root, dirs, files in os.walk(self.temp_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(self.temp_dir)
     
     def test_save_and_load_json(self):
-        """测试JSON文件的保存和加载功能"""
-        # 测试保存JSON文件
-        self.assertTrue(save_json(self.test_data, self.test_file))
-        self.assertTrue(os.path.exists(self.test_file))
+        """测试JSON文件的保存和加载"""
+        test_file = os.path.join(self.temp_dir, "test.json")
+        test_data = {"test": "data", "number": 42}
         
-        # 测试加载JSON文件
-        loaded_data = load_json(self.test_file)
-        self.assertEqual(loaded_data, self.test_data)
+        # 测试保存
+        self.assertTrue(save_to_json(test_file, test_data))
+        self.assertTrue(os.path.exists(test_file))
+        
+        # 测试加载
+        loaded_data = load_from_json(test_file)
+        self.assertEqual(loaded_data, test_data)
         
         # 测试加载不存在的文件
-        self.assertIsNone(load_json('nonexistent.json'))
+        self.assertIsNone(load_from_json("nonexistent.json"))
     
-    def test_format_stock_code(self):
-        """测试股票代码格式化功能"""
-        # 测试上交所代码
-        self.assertEqual(format_stock_code('600000.XSHG'), 'sh600000')
-        self.assertEqual(format_stock_code('sh600000'), 'sh600000')
-        self.assertEqual(format_stock_code('600000'), 'sh600000')
+    def test_ensure_directory(self):
+        """测试目录创建功能"""
+        test_dir = os.path.join(self.temp_dir, "test_dir")
         
-        # 测试深交所代码
-        self.assertEqual(format_stock_code('300718.XSHE'), 'sz300718')
-        self.assertEqual(format_stock_code('sz300718'), 'sz300718')
-        self.assertEqual(format_stock_code('300718'), 'sz300718')
+        # 测试创建目录
+        self.assertTrue(ensure_directory(test_dir))
+        self.assertTrue(os.path.exists(test_dir))
+        
+        # 测试已存在的目录
+        self.assertTrue(ensure_directory(test_dir))
+        
+        # 测试创建嵌套目录
+        nested_dir = os.path.join(test_dir, "nested", "dir")
+        self.assertTrue(ensure_directory(nested_dir))
+        self.assertTrue(os.path.exists(nested_dir))
 
 if __name__ == '__main__':
     unittest.main()

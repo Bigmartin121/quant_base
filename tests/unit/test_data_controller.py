@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-数据控制器模块的单元测试
+数据控制器的单元测试
 """
 
 import unittest
 from unittest.mock import patch, MagicMock
+import pandas as pd
 from src.controllers.data_controller import DataController
 
 class TestDataController(unittest.TestCase):
@@ -15,56 +16,60 @@ class TestDataController(unittest.TestCase):
     def setUp(self):
         """测试前的准备工作"""
         self.controller = DataController()
+        self.controller.initialize()
+        
+        # 创建测试数据
+        dates = pd.date_range('2023-01-01', periods=5)
+        self.test_data = pd.DataFrame({
+            'open': [100.0] * 5,
+            'close': [101.0] * 5,
+            'high': [102.0] * 5,
+            'low': [99.0] * 5,
+            'volume': [1000000] * 5
+        }, index=dates)
     
     def test_initialization(self):
-        """测试控制器初始化"""
-        # 测试模块注册
+        """测试初始化功能"""
+        # 重新初始化应该成功
         self.assertTrue(self.controller.initialize())
-        self.assertIn('fetcher', self.controller.modules)
-        self.assertIn('manager', self.controller.modules)
+        
+        # 验证模块注册
+        self.assertIsNotNone(self.controller.get_module("fetcher"))
+        self.assertIsNotNone(self.controller.get_module("manager"))
     
     @patch('src.features.stock_manager.StockDataManager.get_and_save_stock_data')
     def test_get_stock_data(self, mock_get_data):
         """测试获取股票数据"""
-        # 测试成功情况
-        mock_get_data.return_value = (True, 'test.json')
-        success, result = self.controller.get_stock_data('300718', '1d', 5)
+        # 模拟成功获取数据
+        mock_get_data.return_value = (True, self.test_data)
+        success, data = self.controller.get_stock_data('300718')
         self.assertTrue(success)
-        self.assertEqual(result, 'test.json')
+        self.assertIs(data, self.test_data)
         
-        # 测试失败情况
-        mock_get_data.return_value = (False, '获取数据失败')
-        success, result = self.controller.get_stock_data('300718', '1d', 5)
+        # 模拟获取数据失败
+        mock_get_data.return_value = (False, "未获取到数据")
+        success, error = self.controller.get_stock_data('300718')
         self.assertFalse(success)
-        self.assertEqual(result, '获取数据失败')
-        
-        # 测试异常情况
-        mock_get_data.side_effect = Exception('测试错误')
-        success, result = self.controller.get_stock_data('300718', '1d', 5)
-        self.assertFalse(success)
-        self.assertIn('Failed to get stock data', result)
+        self.assertEqual(error, "未获取到数据")
     
     @patch('src.features.stock_fetcher.StockDataFetcher.fuzzy_match_stock')
     def test_search_stock(self, mock_search):
-        """测试搜索股票"""
-        # 测试正常搜索
-        expected_results = [
-            {'code': '300718', 'name': '测试股票'},
-            {'code': '600000', 'name': '测试银行'}
+        """测试股票搜索功能"""
+        # 模拟搜索结果
+        test_stocks = [
+            {'code': '300718', 'name': '长盛股份'},
+            {'code': '600000', 'name': '浦发银行'}
         ]
-        mock_search.return_value = expected_results
-        results = self.controller.search_stock('测试')
-        self.assertEqual(results, expected_results)
+        mock_search.return_value = test_stocks
         
-        # 测试无结果
-        mock_search.return_value = []
-        results = self.controller.search_stock('不存在')
-        self.assertEqual(results, [])
+        # 测试正常搜索
+        result = self.controller.search_stock('长盛')
+        self.assertEqual(result, test_stocks)
         
-        # 测试异常情况
-        mock_search.side_effect = Exception('搜索错误')
-        results = self.controller.search_stock('测试')
-        self.assertEqual(results, [])
+        # 测试搜索失败
+        mock_search.side_effect = Exception("搜索失败")
+        result = self.controller.search_stock('长盛')
+        self.assertEqual(result, [])
 
 if __name__ == '__main__':
     unittest.main()

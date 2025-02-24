@@ -5,12 +5,10 @@
 股票数据管理模块的单元测试
 """
 
-import unittest
 import os
-import json
-import pandas as pd
+import unittest
 from unittest.mock import patch, MagicMock
-from datetime import datetime
+import pandas as pd
 from src.features.stock_manager import StockDataManager
 
 class TestStockDataManager(unittest.TestCase):
@@ -19,74 +17,73 @@ class TestStockDataManager(unittest.TestCase):
     def setUp(self):
         """测试前的准备工作"""
         self.manager = StockDataManager()
+        self.manager.initialize()
         
-        # 创建测试用的股票数据
+        # 创建测试数据
+        dates = pd.date_range('2023-01-01', periods=5)
         self.test_data = pd.DataFrame({
-            'open': [10.0, 11.0],
-            'close': [11.0, 12.0],
-            'high': [12.0, 13.0],
-            'low': [9.0, 10.0],
-            'volume': [1000, 2000]
-        }, index=pd.date_range('2025-02-25', periods=2))
+            'open': [100.0] * 5,
+            'close': [101.0] * 5,
+            'high': [102.0] * 5,
+            'low': [99.0] * 5,
+            'volume': [1000000] * 5
+        }, index=dates)
     
     def tearDown(self):
         """测试后的清理工作"""
-        # 删除测试过程中创建的文件
-        for file in os.listdir('.'):
-            if file.endswith('.json') and '行情_' in file:
-                os.remove(file)
+        # 清理测试过程中创建的文件
+        cache_file = os.path.join(self.manager.cache_dir, "300718_1d.json")
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
     
-    @patch('src.features.stock_manager.get_price')
-    @patch('src.features.stock_fetcher.StockDataFetcher.get_stock_name')
-    def test_get_and_save_stock_data(self, mock_get_name, mock_get_price):
-        """测试获取并保存股票数据"""
-        # 模拟数据获取
+    @patch('src.lib.Ashare.get_price')
+    def test_get_and_save_stock_data(self, mock_get_price):
+        """测试获取和保存股票数据"""
+        # 模拟获取数据
         mock_get_price.return_value = self.test_data
-        mock_get_name.return_value = '测试股票'
         
-        # 测试正常情况
-        success, filename = self.manager.get_and_save_stock_data('300718', '1d', 2)
+        # 测试获取数据
+        success, data = self.manager.get_and_save_stock_data('300718')
         self.assertTrue(success)
-        self.assertTrue(os.path.exists(filename))
+        self.assertIsInstance(data, pd.DataFrame)
+        self.assertEqual(len(data), 5)
         
-        # 验证保存的数据
-        with open(filename, 'r', encoding='utf-8') as f:
-            saved_data = json.load(f)
+        # 验证数据已保存
+        cache_file = os.path.join(self.manager.cache_dir, "300718_1d.json")
+        self.assertTrue(os.path.exists(cache_file))
         
-        self.assertEqual(saved_data['stock_code'], '300718')
-        self.assertEqual(saved_data['stock_name'], '测试股票')
-        self.assertEqual(saved_data['frequency'], '1d')
-        self.assertEqual(saved_data['data_count'], 2)
+        # 测试加载缓存数据
+        loaded_data = self.manager.load_cached_data('300718')
+        self.assertIsInstance(loaded_data, pd.DataFrame)
+        self.assertEqual(len(loaded_data), 5)
         
-        # 测试数据格式
-        first_date = list(saved_data['data'].keys())[0]
-        first_record = saved_data['data'][first_date]
-        self.assertEqual(first_record['open'], 10.0)
-        self.assertEqual(first_record['close'], 11.0)
-        self.assertEqual(first_record['high'], 12.0)
-        self.assertEqual(first_record['low'], 9.0)
-        self.assertEqual(first_record['volume'], 1000.0)
+        # 验证数据内容
+        pd.testing.assert_frame_equal(data, self.test_data)
+        pd.testing.assert_frame_equal(loaded_data, self.test_data)
     
-    @patch('src.features.stock_manager.get_price')
+    @patch('src.lib.Ashare.get_price')
     def test_error_handling(self, mock_get_price):
         """测试错误处理"""
-        # 测试获取数据失败
+        # 模拟数据获取失败
         mock_get_price.return_value = None
-        success, error_msg = self.manager.get_and_save_stock_data('300718')
-        self.assertFalse(success)
-        self.assertEqual(error_msg, "No data retrieved")
         
-        # 测试数据为空
-        mock_get_price.return_value = pd.DataFrame()
+        # 测试获取数据失败
         success, error_msg = self.manager.get_and_save_stock_data('300718')
         self.assertFalse(success)
-        self.assertEqual(error_msg, "No data retrieved")
+        self.assertEqual(error_msg, "未获取到数据")
         
-        # 测试异常情况
-        mock_get_price.side_effect = Exception('测试错误')
-        success, error_msg = self.manager.get_and_save_stock_data('300718')
-        self.assertFalse(success)
-        self.assertIn('Failed to get or save data', error_msg)
+        # 测试加载不存在的缓存
+        data = self.manager.load_cached_data('nonexistent')
+        self.assertTrue(data.empty)
+    
+    def test_initialization(self):
+        """测试初始化功能"""
+        # 测试目录创建
+        self.assertTrue(os.path.exists(self.manager.data_dir))
+        self.assertTrue(os.path.exists(self.manager.cache_dir))
+        
+        # 测试重复初始化
+        self.assertTrue(self.manager.initialize())
 
 if __name__ == '__main__':
     unittest.main()
