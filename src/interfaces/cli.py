@@ -9,7 +9,7 @@ import logging
 import sys
 import io
 from typing import Optional
-from ..controllers.data_controller import DataController
+from src.controllers.data_controller import DataController
 
 logger = logging.getLogger(__name__)
 
@@ -108,18 +108,10 @@ class StockDataCLI:
                 value = input(prompt)
                 if value.lower() == 'q':
                     return None
-                
+            
                 num = int(value)
                 if min_val <= num <= max_val:
                     return num
                 print(f"请输入 {min_val} 到 {max_val} 之间的数字")
             except ValueError:
                 print("请输入有效的数字")
-
-def main():
-    """主程序入口"""
-    cli = StockDataCLI()
-    cli.run()
-
-if __name__ == '__main__':
-    main()
